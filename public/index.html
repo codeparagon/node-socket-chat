@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Chat Application</h1>
+    
+    <div>
+        <label for="userIdInput">User ID:</label>
+        <input type="text" id="userIdInput" placeholder="Enter your user ID">
+        <button id="connectButton">Connect</button>
+        <button id="disconnectButton">Disconnect</button>
+    </div>
+    
+    <div>
+        <label for="targetIdInput">Send to User ID:</label>
+        <input type="text" id="targetIdInput" placeholder="Enter target user ID">
+        <label for="messageInput">Message:</label>
+        <input type="text" id="messageInput" placeholder="Enter your message">
+        <button id="sendButton">Send</button>
+    </div>
+
+    <h1 id="typingIndicator"></h1>
+    
+    <textarea id="chatDisplay" rows="10" cols="50" readonly></textarea>
+    
+    <script>
+         // Initialize Socket.IO client
+        const socket = io('http://localhost:3000', {
+            path: '/socket.io'  // Ensure this path matches the server configuration
+        });
+
+        // Emit typing event when user is typing
+        const messageInput = document.getElementById('messageInput');
+
+        // Connect button event listener
+        document.getElementById('connectButton').addEventListener('click', () => {
+            const userId = document.getElementById('userIdInput').value.trim(); 
+            if (userId) {
+                console.log('Attempting to connect user:', userId);
+                socket.emit('setUser', { userId, socketId: socket.id });
+                console.log('User set event emitted for userId:', userId);
+
+            } else {
+                console.warn('User ID is empty; connection aborted.');
+            }
+        });
+
+
+        // Listen for the userRooms event from the server
+        socket.on('userRooms', (data) => {
+            if (data.rooms) {
+                console.log('Rooms received:', data.rooms);
+            
+            } else if (data.message) {
+                console.log('Message received:', data.message);
+
+            }
+        });
+
+
+        // Handle typing events 
+
+        messageInput.addEventListener('input', () => {
+            const senderUserId = document.getElementById('userIdInput').value.trim();
+            const targetUserId = document.getElementById('targetIdInput').value.trim();
+
+            const isTyping = messageInput.value.length > 0;
+      
+            socket.emit('typing', { targetUserId: targetUserId, isTyping, senderUserId: senderUserId });
+        });
+
+        // Listen for typing event from the server
+        socket.on('typing', ({ isTyping, senderUserId }) => {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (isTyping) {
+                typingIndicator.textContent = `${senderUserId} is typing...`;
+                
+            } else {
+                typingIndicator.textContent = '';
+            }
+        });
+
+
+        // Send button event listener
+        document.getElementById('sendButton').addEventListener('click', () => {
+            const message = document.getElementById('messageInput').value.trim();
+            const targetUserId = document.getElementById('targetIdInput').value.trim();
+            const senderUserId = document.getElementById('userIdInput').value.trim();
+
+            if (message && targetUserId && senderUserId) {
+                
+                console.log(`Sending message: "${message}" from ${senderUserId} to ${targetUserId}`);
+
+                // Emit the chat message event
+                socket.emit('chatMessage', { message, targetUserId, senderUserId });
+                console.log('Chat message event emitted:', { message, targetUserId, senderUserId });
+
+            } else {
+                console.warn('Message, Target ID, or Sender ID is empty; message not sent.');
+            }
+        });
+
+        // Listen for incoming chat messages
+        socket.on('chatMessage', (data) => {
+            console.log('Received message:', data);
+            const { senderId, message } = data;
+            const chatDisplay = document.getElementById('chatDisplay');
+            const newMessage = `${senderId}: ${message}\n`;
+            chatDisplay.value += newMessage;
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+        });
+        
+        // Disconnect button event listener
+        document.getElementById('disconnectButton').addEventListener('click', () => {
+            console.log('Disconnecting socket...');
+            socket.disconnect();
+            console.log('Socket disconnected.');
+        });
+        
+    </script>
+</body>
+</html>
