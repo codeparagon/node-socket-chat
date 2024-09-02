@@ -164,7 +164,7 @@ async function formatRooms(rooms, userId) {
 
     for (const room of rooms) {
         // Identify the other user in the room
-        const otherUserId = room.user1_id === userId ? room.user2_id : room.user1_id;
+        const otherUserId = (room.user1_id == userId) ? room.user2_id : room.user1_id;
 
         // Check if the other user is online
         const isOnline = await checkUserOnlineStatus(otherUserId);

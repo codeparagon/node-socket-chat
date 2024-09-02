@@ -20,7 +20,6 @@ router.post('/connect', async (req, res) => {
     }
 });
 
-
 // Route to get chat messages between two users
 router.post('/get-chat', async (req, res) => {
     const { senderId, receiverId } = req.body;
@@ -35,7 +34,65 @@ router.post('/get-chat', async (req, res) => {
 
         // Get chat messages from the room
         const messages = await getChatMessages(room.id);
-        res.json({ messages });
+
+        const groupedMessages = messages.reduce((acc, message) => {
+            if (!acc[message.room_id]) {
+                acc[message.room_id] = {
+                    room_id: message.room_id,
+                    messages: []
+                };
+            }
+            acc[message.room_id].messages.push({
+                id: message.id,
+                sender_id: message.sender_id,
+                message: message.message,
+                created_at: message.created_at,
+                updated_at: message.updated_at
+            });
+            return acc;
+        }, {});
+
+        const result = Object.values(groupedMessages);
+
+        res.json(result[0]);
+    } catch (err) {
+        console.error('Error retrieving chat messages:', err);
+        res.status(500).json({ error: 'Failed to retrieve chat messages.' });
+    }
+});
+
+router.post('/get-room-chat', async (req, res) => {
+    const { roomId } = req.body;
+
+    if (!roomId) {
+        return res.status(400).json({ error: 'Room ID is required.' });
+    }
+
+    try {
+
+        // Get chat messages from the room
+        const messages = await getChatMessages(roomId);
+
+        const groupedMessages = messages.reduce((acc, message) => {
+            if (!acc[message.room_id]) {
+                acc[message.room_id] = {
+                    room_id: message.room_id,
+                    messages: []
+                };
+            }
+            acc[message.room_id].messages.push({
+                id: message.id,
+                sender_id: message.sender_id,
+                message: message.message,
+                created_at: message.created_at,
+                updated_at: message.updated_at
+            });
+            return acc;
+        }, {});
+
+        const result = Object.values(groupedMessages);
+
+        res.json(result[0]);
     } catch (err) {
         console.error('Error retrieving chat messages:', err);
         res.status(500).json({ error: 'Failed to retrieve chat messages.' });
