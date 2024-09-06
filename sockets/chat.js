@@ -1,4 +1,5 @@
 const con = require('../config/db');
+const axios = require('axios');
 const users = {};
 
 
@@ -168,6 +169,8 @@ async function formatRooms(rooms, userId) {
 
         // Check if the other user is online
         const isOnline = await checkUserOnlineStatus(otherUserId);
+        
+        const profilePicture = await fetchUserImageUrl(otherUserId);
 
         // Format the room with the other user's ID and online status
         formattedRooms.push({
@@ -175,7 +178,8 @@ async function formatRooms(rooms, userId) {
             otherUserId: otherUserId,
             createdAt: room.created_at,
             updatedAt: room.updated_at,
-            isOnline: isOnline
+            isOnline: isOnline,
+            profilePicture
         });
     }
 
@@ -196,7 +200,6 @@ async function checkUserOnlineStatus(userId) {
         throw err;
     }
 }
-
 
 async function getChatMessages(roomId) {
     const query = `
@@ -233,7 +236,23 @@ async function getUserSocketId(userId) {
     }
 }
 
+async function fetchUserImageUrl(userId) {
+    try {
+        // Fetch a sample image URL based on userId (for example, using albumId)
+        const response = await axios.get(`https://jsonplaceholder.typicode.com/photos?albumId=${userId}`);
+        const photos = response.data;
+
+        if (photos.length > 0) {
+            return photos[0].url; // Return the URL of the first photo
+
+        } else {
+            return 'https://via.placeholder.com/150'; // Fallback image URL
+        }
+    } catch (err) {
+        console.error('Error fetching user image:', err.stack);
+        return 'https://via.placeholder.com/150'; // Return fallback image URL on error
+    }
+}
 
 
-
-module.exports = { initializeSocket, storeSocketConnection, storeMessage, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms };
+module.exports = { initializeSocket, storeSocketConnection, storeMessage, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms, fetchUserImageUrl };
