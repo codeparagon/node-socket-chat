@@ -5,7 +5,11 @@ const con = mysql.createConnection({
     host: "127.0.0.1",
     user: 'root',
     password: "",
-    database: "adminpanel"
+    database: "adminpanel",
+    // host: "127.0.0.1",
+    // user: 'u713182227_adminpanal',
+    // password: "AdminPanal@143",
+    // database: "u713182227_adminpanal"
 });
 
 con.query = util.promisify(con.query);

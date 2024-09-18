@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { storeSocketConnection, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms, fetchUserImageUrl } = require('../sockets/chat');
+const { storeSocketConnection, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms, getUserRooms } = require('../sockets/chat');
 
 // Route to connect a user by storing their socket connection
 router.post('/connect', async (req, res) => {
@@ -116,7 +116,7 @@ router.post('/get-room', async (req, res) => {
 });
 
 // Route to get or create a room between two users
-router.post('/get-user-rooms', async (req, res) => {
+router.post('/get-user-all-rooms', async (req, res) => {
     const { userId } = req.body;
 
     if (!userId) {
@@ -135,6 +135,17 @@ router.post('/get-user-rooms', async (req, res) => {
     } catch (err) {
         console.error('Error retrieving rooms:', err);
         res.status(500).json({ error: 'Failed to retrieve rooms.' });
+    }
+});
+
+router.post('/get-user-rooms', async (req, res) => {
+    const { userId } = req.body;
+    
+    try {
+        const rooms = await getUserRooms(userId);
+        res.json({ rooms });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user rooms.' });
     }
 });
 

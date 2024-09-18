@@ -13,36 +13,57 @@ function initializeSocket(io) {
                     await storeSocketConnection(userId, socketId);
                     console.log(`User ${userId} set with socket id ${socket.id}`);
                     
-                    const rooms = await getAllRooms(userId);
+                    try {
+                        const rooms = await getUserRooms(userId);
 
-                    if (rooms.length === 0) {
-                        socket.emit('userRooms', { message: 'No rooms found.' });
-                    } else {
-                        const formattedRooms = await formatRooms(rooms, userId);
-                        socket.emit('userRooms', { rooms: formattedRooms });
+                        if (rooms.length === 0) {
+                            io.to(socketId).emit('userRooms', { message: 'No rooms found.' });
+                        } else {
+                            io.to(socketId).emit('userRooms', { rooms });
+                        }
+                    } catch (error) {
+                        console.error('Error fetching user rooms:', error);
+                        socket.emit('error', { message: 'Failed to fetch user rooms.' });
                     }
                 }
             } catch (err) {
                 console.error('Error setting user:', err.stack);
+                socket.emit('error', { message: 'Error setting user: '+err.stack });
             }
         });
 
+
         socket.on('chatMessage', async ({ message, targetUserId, senderUserId }) => {
             try {
+
                 const room = await getOrCreateRoom(senderUserId, targetUserId);
-    
-                const targetSocketId = users[targetUserId];
+                
+                // store room message
+                await storeMessage(room.id, senderUserId, message);
+                console.log(`Message from ${senderUserId} to ${targetUserId} stored`);
+
+                const targetSocketId = await getUserSocketId(targetUserId);
+
                 if (targetSocketId) {
                     io.to(targetSocketId).emit('chatMessage', { senderId: senderUserId, message });
-    
-                    await storeMessage(room.id, senderUserId, message);
-    
-                    console.log(`Message from ${senderUserId} to ${targetUserId} stored and emitted.`);
-    
+                                
+                    try {
+                        const rooms = await getUserRooms(targetUserId);
+
+                        if (rooms.length === 0) {
+                            io.to(targetSocketId).emit('userRooms', { message: 'No rooms found.' });
+                        } else {
+                            io.to(targetSocketId).emit('userRooms', { rooms });
+                        }
+                    } catch (error) {
+                        console.error('Error fetching user rooms:', error);
+                        socket.emit('error', { message: 'Failed to fetch user rooms.' });
+                    }
                 } else {
                     console.log(`Target user ${targetUserId} not connected.`);
                 }
             } catch (err) {
+                socket.emit('error', { message: 'Error handling chat message' });
                 console.error('Error handling chat message:', err.stack);
             }
         });
@@ -71,6 +92,7 @@ function initializeSocket(io) {
                 console.log('A user disconnected:', socket.id);
             } catch (err) {
                 console.error('Error during disconnection:', err.stack);
+                socket.emit('error', { message: 'Error during disconnection: '+err.stack });
             }
         });
     });
@@ -186,6 +208,84 @@ async function formatRooms(rooms, userId) {
     return formattedRooms;
 }
 
+// Updated function to get rooms with latest message, message time, and user name
+async function getUserRooms(userId) {
+    const queryFindRooms = `
+        SELECT * FROM rooms 
+        WHERE user1_id = ? OR user2_id = ?
+    `;
+    
+    try {
+        const rooms = await con.query(queryFindRooms, [userId, userId]);
+        
+        const formattedRooms = await Promise.all(rooms.map(async (room) => {
+            const otherUserId = room.user1_id == userId ? room.user2_id : room.user1_id;
+            
+            const isOnline = await checkUserOnlineStatus(otherUserId);
+            const profilePicture = await fetchUserImageUrl(otherUserId);
+            const otherUserName = await getUserName(otherUserId);
+
+            // Fetch the latest message for the room
+            const latestMessageData = await getLatestMessage(room.id);
+            // console.log(otherUserId+isOnline+profilePicture+otherUserName);
+
+            return {
+                roomId: room.id,
+                otherUserId,
+                otherUserName,
+                createdAt: room.created_at,
+                updatedAt: room.updated_at,
+                isOnline,
+                profilePicture,
+                latestMessage: latestMessageData?.message || null,
+                messageTime: latestMessageData?.messageTime || room.created_at, // Fallback to room created time if no messages
+            };
+        }));
+
+        // Sort rooms by latest message time or created time
+        formattedRooms.sort((a, b) => new Date(b.messageTime) - new Date(a.messageTime));
+        
+        return formattedRooms;
+    } catch (err) {
+        console.error('Error retrieving rooms with latest messages:', err.stack);
+        throw err;
+    }
+}
+
+// Fetch the latest message for a room
+async function getLatestMessage(roomId) {
+    const query = `
+        SELECT message, created_at AS messageTime
+        FROM room_messages 
+        WHERE room_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    `;
+
+    try {
+        const messages = await con.query(query, [roomId]);
+        return messages.length > 0 ? messages[0] : null;
+    } catch (err) {
+        console.error('Error fetching latest message:', err.stack);
+        throw err;
+    }
+}
+
+// Fetch the username from the users table
+async function getUserName(userId) {
+    const query = `
+        SELECT name FROM users WHERE id = ?
+    `;
+
+    try {
+        const result = await con.query(query, [userId]);
+        return result.length > 0 ? result[0].name : 'Unknown User';
+    } catch (err) {
+        console.error('Error fetching user name:', err.stack);
+        throw err;
+    }
+}
+
 async function checkUserOnlineStatus(userId) {
     const queryCheckOnline = `
         SELECT COUNT(*) AS count FROM socket_connections
@@ -255,4 +355,4 @@ async function fetchUserImageUrl(userId) {
 }
 
 
-module.exports = { initializeSocket, storeSocketConnection, storeMessage, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms, fetchUserImageUrl };
+module.exports = { initializeSocket, storeSocketConnection, storeMessage, getChatMessages, getOrCreateRoom, getAllRooms, formatRooms, fetchUserImageUrl, getUserRooms };
