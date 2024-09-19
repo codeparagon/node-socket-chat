@@ -68,10 +68,10 @@ router.post('/get-room-chat', async (req, res) => {
     }
 
     try {
-
         // Get chat messages from the room
         const messages = await getChatMessages(roomId);
 
+        // Group messages by room_id
         const groupedMessages = messages.reduce((acc, message) => {
             if (!acc[message.room_id]) {
                 acc[message.room_id] = {
@@ -89,14 +89,22 @@ router.post('/get-room-chat', async (req, res) => {
             return acc;
         }, {});
 
+        // Convert grouped messages to an array
         const result = Object.values(groupedMessages);
 
-        res.json(result[0]);
+        // Sort messages inside each room by created_at in descending order
+        result.forEach(room => {
+            room.messages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        });
+
+        // Return the sorted messages for the specified room
+        res.json(result[0]);  // Assumes roomId is unique, so return the first group
     } catch (err) {
         console.error('Error retrieving chat messages:', err);
         res.status(500).json({ error: 'Failed to retrieve chat messages.' });
     }
 });
+
 
 // Route to get or create a room between two users
 router.post('/get-room', async (req, res) => {
