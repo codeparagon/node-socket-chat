@@ -2,18 +2,10 @@ const mysql = require('mysql');
 const util = require('util');
 
 const con = mysql.createConnection({
-    // host: "127.0.0.1",
-    // user: 'root',
-    // password: "",
-    // database: "adminpanel",
-    host: "bmjb5kfuvxtzqwtds6y0-mysql.services.clever-cloud.com",
-    user: 'uxla1jf8s30muibh',
-    password: "aYB6chZDsbl5q9RMhjOJ",
-    database: "bmjb5kfuvxtzqwtds6y0",
-    // host: process.env.HOST,
-    // user: process.env.USERNAME,
-    // password: process.env.PASSWORD,
-    // database: process.env.DBNAME,
+    host: "127.0.0.1",
+    user: 'root',
+    password: "",
+    database: "adminpanel"
 });
 
 con.query = util.promisify(con.query);
